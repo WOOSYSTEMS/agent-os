@@ -27,6 +27,17 @@ from .capabilities import (
     DEFAULT_CAPABILITIES,
 )
 
+from .memory import (
+    MemoryManager,
+    MemoryScope,
+    MemoryEntry,
+)
+
+from .messaging import (
+    MessageBus,
+    PendingRequest,
+)
+
 __all__ = [
     # Enums
     "AgentState",
@@ -49,4 +60,11 @@ __all__ = [
     # Message
     "Message",
     "Event",
+    # Memory
+    "MemoryManager",
+    "MemoryScope",
+    "MemoryEntry",
+    # Messaging
+    "MessageBus",
+    "PendingRequest",
 ]

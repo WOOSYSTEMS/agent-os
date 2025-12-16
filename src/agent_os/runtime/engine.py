@@ -15,6 +15,8 @@ from ..core.models import (
     ToolResult, ToolResultStatus, Event
 )
 from ..core.capabilities import CapabilityManager, get_default_capabilities
+from ..core.memory import MemoryManager, MemoryScope
+from ..core.messaging import MessageBus
 from ..tools import ToolRegistry, register_builtin_tools, BUILTIN_TOOLS
 
 logger = structlog.get_logger()
@@ -27,16 +29,23 @@ class AgentRuntime:
     Responsibilities:
     - Agent lifecycle (spawn, pause, resume, terminate)
     - Tool execution with capability checking
+    - Memory management (context, working, long-term, shared)
+    - Inter-agent messaging
     - Event emission for observability
     """
 
     def __init__(
         self,
         anthropic_api_key: Optional[str] = None,
+        memory_db_path: Optional[str] = None,
     ):
         # Core managers
         self.capability_manager = CapabilityManager()
         self.tool_registry = ToolRegistry(self.capability_manager)
+
+        # Memory and messaging (Phase 2)
+        self.memory = MemoryManager(db_path=memory_db_path)
+        self.message_bus = MessageBus()
 
         # Register built-in tools
         register_builtin_tools(self.tool_registry)
@@ -59,6 +68,10 @@ class AgentRuntime:
     async def start(self) -> None:
         """Start the runtime."""
         self._running = True
+
+        # Initialize memory system
+        await self.memory.initialize()
+
         await self._emit_event("runtime.started", None, {})
         logger.info("agent_runtime_started")
 
@@ -69,6 +82,9 @@ class AgentRuntime:
         # Terminate all running agents
         for agent_id in list(self._agents.keys()):
             await self.terminate(agent_id)
+
+        # Close memory database
+        await self.memory.close()
 
         await self._emit_event("runtime.stopped", None, {})
         logger.info("agent_runtime_stopped")
@@ -92,6 +108,9 @@ class AgentRuntime:
             # Default capabilities
             default_caps = get_default_capabilities("basic")
             self.capability_manager.grant_many(agent.id, default_caps)
+
+        # Register with message bus for inter-agent communication
+        self.message_bus.register_agent(agent.id)
 
         # Store agent
         self._agents[agent.id] = agent
@@ -282,6 +301,12 @@ class AgentRuntime:
             # Revoke capabilities
             self.capability_manager.revoke_all(agent_id)
 
+            # Clean up memory (context and working, preserve long-term)
+            await self.memory.clear_agent(agent_id)
+
+            # Unregister from message bus
+            self.message_bus.unregister_agent(agent_id)
+
             await self._emit_event("agent.terminated", agent_id, {})
             logger.info("agent_terminated", agent_id=agent_id)
 
@@ -327,3 +352,96 @@ class AgentRuntime:
                 await handler(event)
             except Exception as e:
                 logger.error("event_handler_error", error=str(e))
+
+    # === Memory convenience methods ===
+
+    async def store_memory(
+        self,
+        agent_id: str,
+        key: str,
+        value: any,
+        scope: MemoryScope = MemoryScope.WORKING
+    ) -> None:
+        """Store a value in agent memory."""
+        await self.memory.store(agent_id, key, value, scope)
+
+    async def retrieve_memory(
+        self,
+        agent_id: str,
+        key: str,
+        scope: MemoryScope = MemoryScope.WORKING
+    ) -> any:
+        """Retrieve a value from agent memory."""
+        return await self.memory.retrieve(agent_id, key, scope)
+
+    async def share_memory(
+        self,
+        from_agent: str,
+        key: str,
+        from_scope: MemoryScope = MemoryScope.WORKING
+    ) -> bool:
+        """Share an agent's memory to the shared scope."""
+        return await self.memory.share(from_agent, key, from_scope)
+
+    # === Messaging convenience methods ===
+
+    async def send_message(
+        self,
+        from_agent: str,
+        to_agent: str,
+        payload: dict
+    ):
+        """Send a message between agents."""
+        return await self.message_bus.send(from_agent, to_agent, payload)
+
+    async def request_response(
+        self,
+        from_agent: str,
+        to_agent: str,
+        payload: dict,
+        timeout: float = 30.0
+    ):
+        """Send a request and wait for response."""
+        return await self.message_bus.request(from_agent, to_agent, payload, timeout)
+
+    async def broadcast_event(
+        self,
+        agent_id: str,
+        event_type: str,
+        data: dict
+    ):
+        """Broadcast an event to all subscribers."""
+        return await self.message_bus.broadcast(agent_id, event_type, data)
+
+    def subscribe_to_event(
+        self,
+        agent_id: str,
+        event_type: str,
+        handler
+    ) -> None:
+        """Subscribe an agent to an event type."""
+        self.message_bus.subscribe(agent_id, event_type, handler)
+
+    # === Statistics ===
+
+    def get_stats(self) -> dict:
+        """Get comprehensive runtime statistics."""
+        agent_states = {}
+        for agent in self._agents.values():
+            state = agent.state.value
+            agent_states[state] = agent_states.get(state, 0) + 1
+
+        return {
+            "agents": {
+                "total": len(self._agents),
+                "by_state": agent_states,
+            },
+            "memory": self.memory.get_stats(),
+            "messaging": self.message_bus.get_stats(),
+            "capabilities": {
+                "total_grants": sum(
+                    len(caps) for caps in self.capability_manager._agent_capabilities.values()
+                ),
+            },
+            "running": self._running,
+        }
