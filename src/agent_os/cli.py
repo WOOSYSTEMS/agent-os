@@ -3,6 +3,7 @@ Agent OS Command Line Interface.
 
 Usage:
     agent-os agent "your goal"    Run an agent with a goal
+    agent-os server               Start the dashboard server
     agent-os info                 Show system information
     agent-os tools                List available tools
 """
@@ -163,6 +164,34 @@ def tools():
 
 
 @main.command()
+@click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
+@click.option("--port", "-p", default=8000, help="Port to listen on")
+def server(host: str, port: int):
+    """Start the Agent OS dashboard server.
+
+    Example:
+        agent-os server
+        agent-os server --port 3000
+    """
+    console.print(f"\n[bold green]Agent OS v{__version__}[/bold green]")
+    console.print(f"[dim]Starting dashboard server...[/dim]\n")
+
+    from .api import APIServer
+
+    api_server = APIServer(host=host, port=port)
+
+    console.print(f"[bold]Dashboard:[/bold] http://{host if host != '0.0.0.0' else 'localhost'}:{port}/dashboard")
+    console.print(f"[bold]API Docs:[/bold]  http://{host if host != '0.0.0.0' else 'localhost'}:{port}/docs")
+    console.print(f"[bold]WebSocket:[/bold] ws://{host if host != '0.0.0.0' else 'localhost'}:{port}/ws")
+    console.print("\n[dim]Press Ctrl+C to stop[/dim]\n")
+
+    try:
+        api_server.run()
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Server stopped[/yellow]")
+
+
+@main.command()
 def info():
     """Show Agent OS system information."""
     console.print(f"\n[bold green]Agent OS v{__version__}[/bold green]\n")
@@ -174,7 +203,7 @@ def info():
     info_table.add_row("Version", __version__)
     info_table.add_row("License", "Apache 2.0")
     info_table.add_row("Python", "3.11+")
-    info_table.add_row("Status", "Phase 1 - Foundation")
+    info_table.add_row("Status", "Phase 4 - Dashboard & API")
     info_table.add_row("GitHub", "https://github.com/WOOSYSTEMS/agent-os")
     info_table.add_row("API Key", "✓ Set" if os.environ.get("ANTHROPIC_API_KEY") else "✗ Not set")
 
