@@ -38,6 +38,25 @@ from .messaging import (
     PendingRequest,
 )
 
+from .sandbox import (
+    SandboxManager,
+    SandboxConfig,
+    SandboxPolicy,
+    SandboxResult,
+    ResourceLimits,
+    FilesystemPolicy,
+    NetworkPolicy,
+    SecurityViolation,
+    check_command_safe,
+)
+
+from .audit import (
+    AuditLogger,
+    AuditEvent,
+    AuditEventType,
+    AuditSeverity,
+)
+
 __all__ = [
     # Enums
     "AgentState",
@@ -67,4 +86,19 @@ __all__ = [
     # Messaging
     "MessageBus",
     "PendingRequest",
+    # Sandbox
+    "SandboxManager",
+    "SandboxConfig",
+    "SandboxPolicy",
+    "SandboxResult",
+    "ResourceLimits",
+    "FilesystemPolicy",
+    "NetworkPolicy",
+    "SecurityViolation",
+    "check_command_safe",
+    # Audit
+    "AuditLogger",
+    "AuditEvent",
+    "AuditEventType",
+    "AuditSeverity",
 ]

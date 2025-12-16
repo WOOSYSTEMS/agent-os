@@ -17,6 +17,8 @@ from ..core.models import (
 from ..core.capabilities import CapabilityManager, get_default_capabilities
 from ..core.memory import MemoryManager, MemoryScope
 from ..core.messaging import MessageBus
+from ..core.sandbox import SandboxManager, SandboxConfig, SandboxPolicy
+from ..core.audit import AuditLogger, AuditEventType, AuditSeverity
 from ..tools import ToolRegistry, register_builtin_tools, BUILTIN_TOOLS
 
 logger = structlog.get_logger()
@@ -31,6 +33,7 @@ class AgentRuntime:
     - Tool execution with capability checking
     - Memory management (context, working, long-term, shared)
     - Inter-agent messaging
+    - Security sandboxing and audit logging
     - Event emission for observability
     """
 
@@ -38,6 +41,8 @@ class AgentRuntime:
         self,
         anthropic_api_key: Optional[str] = None,
         memory_db_path: Optional[str] = None,
+        audit_db_path: Optional[str] = None,
+        sandbox_policy: SandboxPolicy = SandboxPolicy.STANDARD,
     ):
         # Core managers
         self.capability_manager = CapabilityManager()
@@ -46,6 +51,11 @@ class AgentRuntime:
         # Memory and messaging (Phase 2)
         self.memory = MemoryManager(db_path=memory_db_path)
         self.message_bus = MessageBus()
+
+        # Security (Phase 3)
+        self.sandbox = SandboxManager()
+        self.audit = AuditLogger(db_path=audit_db_path)
+        self._default_sandbox_policy = sandbox_policy
 
         # Register built-in tools
         register_builtin_tools(self.tool_registry)
@@ -72,6 +82,15 @@ class AgentRuntime:
         # Initialize memory system
         await self.memory.initialize()
 
+        # Initialize audit logging
+        await self.audit.initialize()
+
+        await self.audit.log(
+            AuditEventType.RUNTIME_STARTED,
+            AuditSeverity.INFO,
+            details={"sandbox_policy": self._default_sandbox_policy.value}
+        )
+
         await self._emit_event("runtime.started", None, {})
         logger.info("agent_runtime_started")
 
@@ -83,8 +102,17 @@ class AgentRuntime:
         for agent_id in list(self._agents.keys()):
             await self.terminate(agent_id)
 
+        # Log runtime stop
+        await self.audit.log(
+            AuditEventType.RUNTIME_STOPPED,
+            AuditSeverity.INFO
+        )
+
         # Close memory database
         await self.memory.close()
+
+        # Close audit logger
+        await self.audit.close()
 
         await self._emit_event("runtime.stopped", None, {})
         logger.info("agent_runtime_stopped")
@@ -114,6 +142,13 @@ class AgentRuntime:
 
         # Store agent
         self._agents[agent.id] = agent
+
+        # Audit log spawn
+        await self.audit.log_agent_spawned(agent.id, {
+            "goal": config.goal,
+            "model": config.model,
+            "tools": config.tools,
+        })
 
         await self._emit_event("agent.spawned", agent.id, {
             "goal": config.goal,
@@ -438,6 +473,8 @@ class AgentRuntime:
             },
             "memory": self.memory.get_stats(),
             "messaging": self.message_bus.get_stats(),
+            "sandbox": self.sandbox.get_stats(),
+            "audit": self.audit.get_stats(),
             "capabilities": {
                 "total_grants": sum(
                     len(caps) for caps in self.capability_manager._agent_capabilities.values()
@@ -445,3 +482,23 @@ class AgentRuntime:
             },
             "running": self._running,
         }
+
+    # === Security convenience methods ===
+
+    async def execute_sandboxed(
+        self,
+        command: str,
+        agent_id: Optional[str] = None,
+        policy: Optional[SandboxPolicy] = None
+    ):
+        """Execute a command in a sandbox."""
+        config = self.sandbox.create_config(policy or self._default_sandbox_policy)
+        return await self.sandbox.execute_command(command, config, agent_id)
+
+    async def get_security_events(self, limit: int = 50):
+        """Get recent security-related audit events."""
+        return await self.audit.get_security_events(limit=limit)
+
+    async def get_agent_audit_history(self, agent_id: str, limit: int = 50):
+        """Get audit history for an agent."""
+        return await self.audit.get_agent_history(agent_id, limit=limit)
