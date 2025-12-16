@@ -30,6 +30,7 @@ dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "httpx>=0.25.0",
+    "aiofiles>=23.0.0",
     "aiosqlite>=0.19.0",
     "anthropic>=0.18.0",
     "click>=8.0.0",
@@ -51,10 +52,10 @@ dev = [
 agent-os = "agent_os.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/YOUR_USERNAME/agent-os"
-Documentation = "https://github.com/YOUR_USERNAME/agent-os/docs"
-Repository = "https://github.com/YOUR_USERNAME/agent-os"
-Issues = "https://github.com/YOUR_USERNAME/agent-os/issues"
+Homepage = "https://github.com/WOOSYSTEMS/agent-os"
+Documentation = "https://github.com/WOOSYSTEMS/agent-os/docs"
+Repository = "https://github.com/WOOSYSTEMS/agent-os"
+Issues = "https://github.com/WOOSYSTEMS/agent-os/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
