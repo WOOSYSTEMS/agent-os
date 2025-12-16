@@ -22,6 +22,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.0-alpha.4] - 2025-12-15
+
+### Added
+- **REST API** with FastAPI:
+  - Health check and stats endpoints
+  - Agent CRUD operations
+  - Sandboxed command execution
+  - Memory and messaging APIs
+  - Audit event queries
+  - Tools listing
+- **WebSocket** for real-time updates:
+  - Event streaming
+  - Connection manager with subscriptions
+  - Broadcast to all clients
+- **Web Dashboard**:
+  - Real-time stats display
+  - Agent list with state visualization
+  - Live event log
+  - Spawn/terminate agents from UI
+- **CLI Server command**: `agent-os server`
+
+---
+
 ## [0.1.0-alpha.3] - 2025-12-15
 
 ### Added
