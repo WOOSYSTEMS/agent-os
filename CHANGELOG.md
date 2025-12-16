@@ -22,6 +22,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.0-alpha.3] - 2025-12-15
+
+### Added
+- **Sandbox Manager** for secure execution:
+  - Process isolation with configurable policies
+  - Resource limits (CPU, memory, time, processes)
+  - Policy presets: unrestricted, standard, strict
+  - Command safety checking
+- **Policy Engine** for access control:
+  - Filesystem access control (read/write paths)
+  - Network access control (host/port filtering)
+  - Dangerous command detection
+- **Audit Logger** for security tracking:
+  - Complete audit trail for all agent actions
+  - Multiple event types and severity levels
+  - SQLite persistence with query interface
+  - Security event aggregation
+
+### Changed
+- Runtime now initializes sandbox and audit on start
+- Agent spawns are logged to audit trail
+- Runtime stats include security metrics
+
+---
+
 ## [0.1.0-alpha.2] - 2025-12-15
 
 ### Added
